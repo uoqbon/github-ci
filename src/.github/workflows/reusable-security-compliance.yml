@@ -1,0 +1,94 @@
+# =============================================================================
+# Mandatory Security & Compliance — acme/.github-governance
+# -----------------------------------------------------------------------------
+# Called by reusable-ci.yml (nesting depth 2 of 10). Runs:
+#   - actionlint   (workflow correctness)
+#   - zizmor       (workflow SECURITY static analysis)
+#   - SHA-pin audit (defense in depth — enterprise policy also enforces)
+#   - conftest/OPA (policy-as-code "workflow compilation" gate)
+#   - OIDC verify  (keyless cloud auth, no long-lived secrets)
+#   - provenance   (SLSA build attestation)
+# Replace placeholder SHAs with real release SHAs before use.
+# =============================================================================
+name: reusable-security-compliance
+
+on:
+  workflow_call: {}
+
+permissions:
+  contents: read
+
+jobs:
+  workflow-compliance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # 1. Consumer repo at root — to lint ITS workflows.
+      - name: Checkout consumer repo
+        uses: actions/checkout@0a1b2c3d4e5f60718293a4b5c6d7e8f901234567 # v4.2.2
+
+      # 2. Governance repo into .governance — to fetch the OPA policy bundle.
+      - name: Checkout governance policy
+        uses: actions/checkout@0a1b2c3d4e5f60718293a4b5c6d7e8f901234567 # v4.2.2
+        with:
+          repository: acme/.github-governance
+          ref: 0a1b2c3d4e5f60718293a4b5c6d7e8f901234567   # pin to the approved SHA
+          path: .governance
+
+      - name: actionlint (workflow correctness)
+        run: |
+          bash <(curl -sSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          ./actionlint -color
+
+      - name: zizmor (workflow security SAST)
+        run: pipx run zizmor --persona=auditor .github/workflows/ || true
+        # Promote to a hard gate once the baseline is clean:
+        #   pipx run zizmor --min-severity=medium .github/workflows/
+
+      - name: SHA-pin audit (defense in depth)
+        run: |
+          # Fail if any non-local `uses:` is not pinned to a full 40-char SHA.
+          if grep -rEn 'uses:[[:space:]]+[^@[:space:]]+@[^[:space:]]+' .github/ \
+               | grep -vE 'uses:[[:space:]]+\./' \
+               | grep -vE '@[0-9a-f]{40}([[:space:]]|$)'; then
+            echo "::error::Unpinned action reference found — pin to a full 40-char SHA."
+            exit 1
+          fi
+
+      - name: Policy-as-code compliance gate (OPA / conftest)
+        run: |
+          curl -sSL -o conftest.tgz \
+            https://github.com/open-policy-agent/conftest/releases/latest/download/conftest_Linux_x86_64.tar.gz
+          tar xzf conftest.tgz conftest
+          ./conftest test --policy .governance/policy/ .github/workflows/
+
+  oidc-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Verify keyless cloud auth (no long-lived secrets)
+        # Full-path action ref — fetched automatically; no checkout of governance repo needed.
+        uses: acme/.github-governance/actions/oidc-cloud-login@0a1b2c3d4e5f60718293a4b5c6d7e8f901234567 # approved SHA
+        with:
+          cloud: aws
+          aws-role-arn: ${{ vars.AWS_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+  provenance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+      contents: read
+      attestations: write
+    steps:
+      - uses: actions/checkout@0a1b2c3d4e5f60718293a4b5c6d7e8f901234567 # v4.2.2
+      - name: Produce build artifact (placeholder)
+        run: echo "artifact-bytes" > artifact.bin
+      - name: Attest build provenance (SLSA)
+        uses: actions/attest-build-provenance@2c3d4e5f60718293a4b5c6d7e8f90123456789ab # v2.2.0
+        with:
+          subject-path: artifact.bin

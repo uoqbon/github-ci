@@ -1,0 +1,23 @@
+{
+  "_comment": "LAYER 3 — Repository-target ruleset. Governs the repo's own metadata so it cannot be mutated OUT of the property-targeted controls. Enforces a naming convention. Combine with org member-privilege settings (disable ad-hoc repo creation / public repos) so the self-service governor stays the only sanctioned provisioning path.",
+  "name": "repo-metadata-guardrails",
+  "target": "repository",
+  "enforcement": "active",
+  "conditions": {
+    "repository_name": {
+      "include": ["~ALL"],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {
+      "type": "repository_name",
+      "parameters": {
+        "operator": "regex",
+        "pattern": "^(svc|app|lib)-[a-z0-9-]+$",
+        "negate": false
+      }
+    }
+  ],
+  "bypass_actors": []
+}

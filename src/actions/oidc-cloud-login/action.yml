@@ -1,0 +1,56 @@
+# =============================================================================
+# Composite action: oidc-cloud-login
+# Keyless cloud auth via GitHub OIDC (NO long-lived cloud secrets) + identity
+# verification. Requires the calling job to set `permissions: id-token: write`.
+# The cloud-side trust policy MUST scope the `sub` claim to repo/branch/env —
+# never `repo:acme/*:*`.
+# =============================================================================
+name: oidc-cloud-login
+description: Federated, keyless login to AWS or Azure via GitHub OIDC, with identity verification.
+
+inputs:
+  cloud:
+    description: "Target cloud: aws | azure"
+    required: true
+  aws-role-arn:
+    description: "IAM role ARN to assume (AWS)."
+    required: false
+  aws-region:
+    description: "AWS region."
+    required: false
+    default: "us-east-1"
+  azure-client-id:
+    required: false
+  azure-tenant-id:
+    required: false
+  azure-subscription-id:
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: AWS — assume role via OIDC (short-lived creds, default 1h)
+      if: ${{ inputs.cloud == 'aws' }}
+      uses: aws-actions/configure-aws-credentials@1b2c3d4e5f60718293a4b5c6d7e8f9012345678a # v4.0.2
+      with:
+        role-to-assume: ${{ inputs.aws-role-arn }}
+        aws-region: ${{ inputs.aws-region }}
+        role-session-name: gha-${{ github.run_id }}
+
+    - name: AWS — verify caller identity
+      if: ${{ inputs.cloud == 'aws' }}
+      shell: bash
+      run: aws sts get-caller-identity
+
+    - name: Azure — login via federated credential (no client secret)
+      if: ${{ inputs.cloud == 'azure' }}
+      uses: azure/login@2c3d4e5f60718293a4b5c6d7e8f90123456789ab # v2.2.0
+      with:
+        client-id: ${{ inputs.azure-client-id }}
+        tenant-id: ${{ inputs.azure-tenant-id }}
+        subscription-id: ${{ inputs.azure-subscription-id }}
+
+    - name: Azure — verify account
+      if: ${{ inputs.cloud == 'azure' }}
+      shell: bash
+      run: az account show

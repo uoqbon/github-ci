@@ -1,0 +1,34 @@
+{
+  "_comment": "LAYER 1 — Require the golden-path reusable workflow to pass before merge on tier=production repos. Create via: gh api -X POST /orgs/ACME/rulesets --input rulesets/org-require-golden-path.json. Roll out with enforcement=evaluate (dry run) first, then flip to active. bypass_actors is intentionally EMPTY so no one (incl. admins/Copilot) can skip it.",
+  "name": "require-golden-path-ci",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": {
+    "ref_name": {
+      "include": ["~DEFAULT_BRANCH"],
+      "exclude": []
+    },
+    "repository_property": {
+      "include": [
+        { "name": "tier", "property_values": ["production"], "source": "custom" }
+      ],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {
+      "type": "workflows",
+      "parameters": {
+        "workflows": [
+          {
+            "repository_id": 987654321,
+            "path": ".github/workflows/reusable-ci.yml",
+            "ref": "refs/heads/main",
+            "sha": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567"
+          }
+        ]
+      }
+    }
+  ],
+  "bypass_actors": []
+}

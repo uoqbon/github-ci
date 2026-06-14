@@ -1,0 +1,32 @@
+{
+  "_comment": "LAYER 2b — Hard path lock. Blocks pushes that modify workflow files or CODEOWNERS on tier=production repos, except for the platform team (bypass). Pair with a branch ruleset that requires Code Owner review (Layer 2a) so the corporate CI standard cannot be edited away. Replace actor_id 4242 with your platform team's ID.",
+  "name": "protect-workflow-files",
+  "target": "push",
+  "enforcement": "active",
+  "conditions": {
+    "repository_property": {
+      "include": [
+        { "name": "tier", "property_values": ["production"], "source": "custom" }
+      ],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {
+      "type": "file_path_restriction",
+      "parameters": {
+        "restricted_file_paths": [
+          ".github/workflows/**",
+          ".github/CODEOWNERS"
+        ]
+      }
+    }
+  ],
+  "bypass_actors": [
+    {
+      "actor_id": 4242,
+      "actor_type": "Team",
+      "bypass_mode": "always"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+# =============================================================================
+# Consumer caller workflow — this is the ENTIRE CI a product team writes.
+# Place at: <consumer-repo>/.github/workflows/ci.yml
+# All real logic lives centrally in reusable-ci.yml (versioned, SHA-pinned).
+# =============================================================================
+name: CI            # MUST match `workflows: ["CI"]` in self-healing-ci.yml
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A called reusable workflow CANNOT exceed the caller's token scopes, and the
+# org default token is read-only — so we grant exactly what the golden path needs.
+permissions:
+  contents: read
+  id-token: write          # OIDC keyless cloud auth
+  security-events: write   # SARIF upload from scanners
+  attestations: write      # build provenance
+
+jobs:
+  ci:
+    # Pin to the platform-team-approved SHA. The required-workflow ruleset
+    # (rulesets/org-require-golden-path.json) enforces this exact SHA.
+    uses: acme/.github-governance/.github/workflows/reusable-ci.yml@0a1b2c3d4e5f60718293a4b5c6d7e8f901234567
+    with:
+      language: node
+      runner: ubuntu-latest
+    secrets: inherit
